@@ -1,0 +1,4 @@
+BOT_TOKEN="paste_token_from_BotFather_here"
+TELEGRAM_WEBHOOK_SECRET="replace_with_32_random_letters_numbers_dashes"
+SETUP_SECRET="replace_with_another_long_random_secret"
+CLAIM_CODE="replace_with_a_long_private_first_login_code"
