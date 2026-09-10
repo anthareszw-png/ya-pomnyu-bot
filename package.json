@@ -1,0 +1,17 @@
+{
+  "name": "ya-pomnyu-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Личный Telegram-бот напоминаний на Cloudflare Workers и Durable Objects",
+  "scripts": {
+    "test": "node --test",
+    "check": "npm test && npx --no-install wrangler deploy --dry-run --outdir .wrangler-dist",
+    "dev": "npx --no-install wrangler dev",
+    "deploy": "npx --no-install wrangler deploy",
+    "setup": "node scripts/setup.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.130.0"
+  }
+}

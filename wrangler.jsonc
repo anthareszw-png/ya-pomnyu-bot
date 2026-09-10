@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ya-pomnyu-bot",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-09",
+  "workers_dev": true,
+  "keep_vars": true,
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REMINDER_BOT",
+        "class_name": "ReminderBot"
+      }
+    ]
+  },
+  "exports": {
+    "ReminderBot": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
