@@ -5,6 +5,45 @@ import { epochFromTokyo, parseReminder, tokyoDayBounds, tokyoParts } from "../sr
 const EVENING = Date.parse("2026-09-09T12:00:00.000Z"); // 21:00 в Токио
 const NIGHT = Date.parse("2026-09-09T17:35:00.000Z"); // 02:35 10 сентября в Токио
 
+for (const [input, expected] of [
+  ["25 сентября подписка", [2026, 9, 25, 9, 0]],
+  ["25 числа подписка", [2026, 9, 25, 9, 0]],
+  ["25 сентября в 19:30 подписка", [2026, 9, 25, 19, 30]],
+  ["25 сентября 2027 года подписка", [2027, 9, 25, 9, 0]],
+  ["25 вересня подписка", [2026, 9, 25, 9, 0]],
+  ["на 25-е сентября вечером подписка", [2026, 9, 25, 19, 0]],
+  ["9 числа подписка", [2026, 10, 9, 9, 0]],
+  ["1 января подписка", [2027, 1, 1, 9, 0]],
+  ["29 февраля подписка", [2028, 2, 29, 9, 0]],
+  ["25 грудня 2026 року подписка", [2026, 12, 25, 9, 0]],
+  ["подписка 25 сентября в 7 вечера", [2026, 9, 25, 19, 0]]
+]) {
+  test(`календарная дата: ${input}`, () => {
+    const result = parseReminder(input, EVENING);
+    assert.equal(result.ok, true);
+    assert.equal(result.text, "подписка");
+    assert.equal(result.remindAt, epochFromTokyo(...expected));
+  });
+}
+
+for (const input of ["31 сентября подписка", "0 числа подписка", "32 числа подписка",
+  "25 сентября 2025 подписка", "29 февраля 2027 подписка", "25 сентября в 25:00 подписка",
+  "завтра 25 сентября подписка"]) {
+  test(`отклоняет некорректную дату: ${input}`, () => {
+    assert.equal(parseReminder(input, EVENING).ok, false);
+  });
+}
+
+test("31 числа пропускает короткий месяц", () => {
+  const result = parseReminder("31 числа подписка", epochFromTokyo(2026, 4, 1));
+  assert.equal(result.remindAt, epochFromTokyo(2026, 5, 31, 9));
+});
+
+test("сегодняшняя календарная дата учитывает время", () => {
+  assert.equal(parseReminder("9 сентября в 22:00 подписка", EVENING).remindAt, epochFromTokyo(2026, 9, 9, 22));
+  assert.equal(parseReminder("9 сентября подписка", EVENING).remindAt, epochFromTokyo(2027, 9, 9, 9));
+});
+
 test("понимает минуты от текущего момента", () => {
   const result = parseReminder("через 15 минут поесть", EVENING);
   assert.equal(result.ok, true);
