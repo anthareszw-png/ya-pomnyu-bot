@@ -136,6 +136,38 @@ function findExplicitTime(input) {
   };
 }
 
+const MONTH_NAMES = [
+  "январь января січень січня", "февраль февраля лютий лютого",
+  "март марта березень березня", "апрель апреля квітень квітня",
+  "май мая травень травня", "июнь июня червень червня",
+  "июль июля липень липня", "август августа серпень серпня",
+  "сентябрь сентября вересень вересня", "октябрь октября жовтень жовтня",
+  "ноябрь ноября листопад листопада", "декабрь декабря грудень грудня"
+];
+const MONTHS = new Map(MONTH_NAMES.flatMap((names, index) =>
+  names.split(" ").map(name => [name, index + 1])));
+const CALENDAR_DATE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:на\\s+)?(\\d{1,2})(?:-?(?:го|е))?\\s+(${[...MONTHS.keys()].join("|")}|числа)(?![\\p{L}\\p{N}])(?:\\s+(\\d{4})(?![\\p{L}\\p{N}])(?:\\s*(?:года|г\\.|року)(?![\\p{L}\\p{N}]))?)?`, "iu"
+);
+
+function resolveCalendarDate(match, nowMs, hour, minute) {
+  const day = Number(match[1]);
+  const month = MONTHS.get(match[2].toLowerCase());
+  const year = match[3] ? Number(match[3]) : null;
+  if (day < 1 || day > 31 || (year !== null && (year < 100 || !month))) return null;
+  const now = tokyoParts(nowMs);
+  // Search future occurrences, skipping nonexistent dates (including leap days).
+  const attempts = year !== null ? 1 : month ? 9 : 13;
+  for (let i = 0; i < attempts; i++) {
+    const candidateYear = year ?? (month ? now.year + i : now.year + Math.floor((now.month - 1 + i) / 12));
+    const candidateMonth = month ?? ((now.month - 1 + i) % 12 + 1);
+    const epoch = epochFromTokyo(candidateYear, candidateMonth, day, hour, minute);
+    const parts = tokyoParts(epoch);
+    if (parts.year === candidateYear && parts.month === candidateMonth && parts.day === day && epoch > nowMs) return epoch;
+  }
+  return null;
+}
+
 /**
  * Разбирает короткое русское напоминание относительно времени отправки.
  * Все календарные значения трактуются в часовом поясе Asia/Tokyo.
@@ -156,12 +188,14 @@ export function parseReminder(input, nowMs = Date.now()) {
 
   const dayMatch = original.match(/(?<![\p{L}\p{N}])(сегодня|послезавтра|завтра)(?![\p{L}\p{N}])/iu);
   const dayWord = dayMatch?.[1]?.toLowerCase() ?? null;
-  const timeMatch = findExplicitTime(original);
+  const dateMatch = original.match(CALENDAR_DATE);
+  const withoutDate = dateMatch ? original.replace(dateMatch[0], "") : original;
+  const timeMatch = findExplicitTime(withoutDate);
   const daypartMatch = timeMatch
     ? null
     : original.match(/(?<![\p{L}\p{N}])(утром|дн[её]м|вечером|ночью)(?![\p{L}\p{N}])/iu);
 
-  if (!timeMatch && !daypartMatch && !dayWord) {
+  if (!timeMatch && !daypartMatch && !dayWord && !dateMatch) {
     return {
       ok: false,
       error: "Не понял время. Например: «через час поесть», «утром выпить чай» или «завтра в 9:30 съёмка»."
@@ -188,14 +222,18 @@ export function parseReminder(input, nowMs = Date.now()) {
   }
 
   let remindAt = epochFromTokyo(date.year, date.month, date.day, hour, minute);
-  if (!dayWord && remindAt <= nowMs) {
+  if (dateMatch) {
+    if (dayWord) return { ok: false, error: "Укажи одну дату напоминания." };
+    remindAt = resolveCalendarDate(dateMatch, nowMs, hour, minute);
+    if (remindAt === null) return { ok: false, error: "Такой даты не бывает или указанная дата уже прошла." };
+  } else if (!dayWord && remindAt <= nowMs) {
     date = addTokyoDays(now, 1);
     remindAt = epochFromTokyo(date.year, date.month, date.day, hour, minute);
   } else if (dayWord === "сегодня" && remindAt <= nowMs) {
     return { ok: false, error: "Это время сегодня уже прошло." };
   }
 
-  let textSource = original;
+  let textSource = withoutDate;
   if (dayMatch) textSource = textSource.replace(dayMatch[0], "");
   if (timeMatch) textSource = textSource.replace(timeMatch.raw, "");
   if (daypartMatch) textSource = textSource.replace(daypartMatch[0], "");
